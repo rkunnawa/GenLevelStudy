@@ -124,7 +124,13 @@ private:
 
   std::vector <double> pt;
   std::vector <double> phi;
+  std::vector <double> eta;
   std::vector <int> flav;
+
+  std::vector <double> par_pt;
+  std::vector <double> par_eta;
+  std::vector <double> par_phi;
+  std::vector <int> par_flav;
 
   std::map<std::string,TH1F*> hist_;
   std::map<std::string,TH2F*> hist2D_;
@@ -397,6 +403,40 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
   pt.clear();
   phi.clear();
   flav.clear();
+  eta.clear();
+
+  par_pt.clear();
+  par_eta.clear();
+  par_phi.clear();
+  par_flav.clear();
+  
+  // std::cout<<"Leading Jet pT = "<<pt[0] <<"; eta = "<<eta[0]<<"; phi = "<<phi[0]<<std::endl;
+  // std::cout<<"SubLeading Jet pT = "<<pt[1] <<"; eta = "<<eta[1]<<"; phi = "<<phi[1]<<std::endl;
+  // std::cout<<"third  Jet pT = "<<pt[2] <<"; eta = "<<eta[2]<<"; phi = "<<phi[2]<<std::endl;
+  
+  // charged particle spectra and ff matrix
+  double lead_track_pt = 0.0;
+  for( const auto & h : *pcol )
+    {
+      counter++;
+      // Only look at the initial scalttered particles 
+      // if( h.status() == 2 || h.status() == 3  ){
+      // 	if(fabs(h.pdgId())<=2 || h.pdgId()==21) std::cout<<"gen particle type = "<<h.pdgId()<<std::endl;
+      // }
+      // number 7 and 8 are the initial scattered particles. 
+      if(counter == 7 || counter == 8)
+	{
+	  // std::cout<<"Gen Particle: "<<counter<<"; id = "<<h.pdgId()<<"; pt = "<<h.pt()<<"; eta = "<<h.eta()<<"; phi = "<<h.phi()<<std::endl<<"                DeltaR with Leading = "<<(float)deltaR(h.eta(), h.phi(), eta[0], phi[0])<<std::endl<<"                DeltaR with subleading = "<<(float)deltaR(h.eta(), h.phi(), eta[1], phi[1])<<std::endl<<"                DeltaR with third = "<<(float)deltaR(h.eta(), h.phi(), eta[2], phi[2])<<std::endl;
+	  par_pt.push_back(h.pt());
+	  par_eta.push_back(h.eta());
+	  par_phi.push_back(h.phi());
+	  par_flav.push_back(h.pdgId());
+	}
+      
+    }
+  
+  
+  counter = 0;
 
   // genjet spectra
   if ( doFlavor_ )
@@ -442,8 +482,8 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 		  int flavor = (int)GetFlavor( mjp.second );
 		  pt.push_back(aJet->pt());
 		  phi.push_back(aJet->phi());
+		  eta.push_back(aJet->eta());
 		  flav.push_back(flavor);
-		  
 		}
 	      
 	      hist_["jetspectrum"]->Fill(aJet->pt());
@@ -468,14 +508,64 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
   // std::cout<<"Total number of jets in event = "<<pt.size()<<std::endl;
   if(pt.size()<=1) return;
+  if(pt[0]<10 || pt[1]<10) return;
   // std::cout<<" Now checking if event is dijet parton matched  "<<std::endl;
   // check which flavor event is in and fill histograms for qq, qg, gq and gg
 
+  // Now to find the flavor of the dijet event. need to match the partons from the initial scattering to the leading/subleading jets.
+
+  bool isqq = false;
+  bool isqg = false;
+  bool isgq = false;
+  bool isgg = false;
+
+  // std::vector <std::vector <double> > delR_par_jet;
+
+  // for(unsigned ij = 0; ij<pt.size(); ++ij)
+  //   {
+  //     for(unsigned ip = 0; ip<par_pt.size(); ++ip)
+  // 	{
+  // 	  delR_par_jet[ij][ip] = deltaR2(par_eta[ip], par_phi[ip], eta[ij], phi[ij]);
+  // 	}
+  //   }
+    
+  double delR_par1_jet1 = deltaR2(par_eta[0], par_phi[0], eta[0], phi[0]);
+  double delR_par1_jet2 = deltaR2(par_eta[0], par_phi[0], eta[1], phi[1]);
+  double delR_par2_jet1 = deltaR2(par_eta[1], par_phi[1], eta[0], phi[0]);
+  double delR_par2_jet2 = deltaR2(par_eta[1], par_phi[1], eta[1], phi[1]);
+
+  if((delR_par1_jet1 > 0.3 && delR_par1_jet2 > 0.3) || (delR_par2_jet1 > 0.3 && delR_par2_jet2 > 0.3)) return;
+
+  if(fabs(par_flav[0])<=6 && fabs(par_flav[1])<=6 )
+    isqq = true;
+  if(par_flav[0] == 21 && par_flav[1] == 21 )
+    isgg = true;
+  
+  if(fabs(par_flav[0])<=6 && par_flav[1] == 21) 
+    {
+      if((delR_par1_jet1 < delR_par1_jet2)) isqg = true;
+      else isgq = true;
+    }
+  if(par_flav[0]==21 && fabs(par_flav[1])<=6 )
+    {
+      if((delR_par1_jet1 < delR_par1_jet2)) isgq = true;
+      else isqg = true;
+    }
+      
   bool isSignal = true;
   bool isSignal_qq = true;
   bool isSignal_qg = true;
   bool isSignal_gq = true;
   bool isSignal_gg = true;
+
+  // std::cout<<"Dijet Flavor  = "<<par_flav[0]<<"; "<<par_flav[1]<<std::endl;
+  // std::cout<<"Delta R, par1 = ("<<delR_par1_jet1<<","<<delR_par1_jet2<<")"<<std::endl;
+  // std::cout<<"Delta R, par2 = ("<<delR_par2_jet1<<","<<delR_par2_jet2<<")"<<std::endl;
+  // std::cout<<"Boolean values = "<<std::endl;
+  // std::cout<<"    isqq = "<<isqq<<std::endl;
+  // std::cout<<"    isgq = "<<isgq<<std::endl;
+  // std::cout<<"    isqg = "<<isqg<<std::endl;
+  // std::cout<<"    isgg = "<<isgg<<std::endl;
 
   delPhi = deltaPhi(phi[0], phi[1]);
 
@@ -489,7 +579,7 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
   // std::cout<<"Checking for signal"<<std::endl;
   
   // qq
-  if(fabs(flav[0])<=2 && fabs(flav[1])<=2)
+  if(isqq)
     {
       if( pt[0] < 3 * combBKGRMS_ )
 	isSignal_qq = false;
@@ -499,7 +589,7 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 	isSignal_qq = false;      
     }
   // qg
-  if(fabs(flav[0])<=2 && flav[1] == 21)
+  if(isqg)
     {
       if( pt[0] < 3 * combBKGRMS_ )
 	isSignal_qg = false;
@@ -509,7 +599,7 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 	isSignal_qg = false;      
     }
   // gq
-  if(flav[0] == 21 && fabs(flav[1])<=2)
+  if(isgq)
     {
       if( pt[0] < 3 * combBKGRMS_ )
 	isSignal_gq = false;
@@ -519,7 +609,7 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 	isSignal_gq = false;      
     }
   // gg
-  if(flav[0] == 21 && flav[1] == 21)
+  if(isgg)
     {
       if( pt[0] < 3 * combBKGRMS_ )
 	isSignal_gg = false;
@@ -541,7 +631,7 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
   // std::cout<<"Filling event histograms qq"<<std::endl;
 
-  if(fabs(flav[0])<=2 && fabs(flav[1])<=2)
+  if(isqq)
     {
       hist_["hDeltaPhi_qq"]->Fill(delPhi);
       hist_["hLeading_qq"]->Fill(pt[0]);
@@ -552,7 +642,7 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     }
   // std::cout<<"Filling event histograms gg"<<std::endl;
 
-  if(flav[0] == 21 && flav[1] == 21)
+  if(isgg)
     {
       hist_["hDeltaPhi_gg"]->Fill(delPhi);
       hist_["hLeading_gg"]->Fill(pt[0]);
@@ -563,7 +653,7 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     }
   // std::cout<<"Filling event histograms qg"<<std::endl;
 
-  if(fabs(flav[0])<=2 && flav[1] == 21)
+  if(isqg)
     {
       hist_["hDeltaPhi_qg"]->Fill(delPhi);
       hist_["hLeading_qg"]->Fill(pt[0]);
@@ -574,7 +664,7 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     }
   // std::cout<<"Filling event histograms qg"<<std::endl;
 
-  if(flav[0] == 21 && fabs(flav[1])<=2)
+  if(isgq)
     {
       hist_["hDeltaPhi_gq"]->Fill(delPhi);
       hist_["hLeading_gq"]->Fill(pt[0]);
@@ -594,28 +684,28 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       if(!isSignal) hist_["hBKG"]->Fill(pt[ij]);
 
       // std::cout<<"Filling Jet histograms qq"<<std::endl;
-      if(fabs(flav[0])<=2 && fabs(flav[1])<=2)
+      if(isqq)
 	{
 	  hist_["hAllJets_qq"]->Fill(pt[ij]);
 	  if(isSignal_qq) hist_["hSignal_qq"]->Fill(pt[ij]);
 	  if(!isSignal_qq) hist_["hBKG_qq"]->Fill(pt[ij]);
 	}
       // std::cout<<"Filling Jet histograms gg"<<std::endl;
-      if(flav[0] == 21 && flav[1] == 21)
+      if(isgg)
 	{
 	  hist_["hAllJets_gg"]->Fill(pt[ij]);
 	  if(isSignal_gg) hist_["hSignal_gg"]->Fill(pt[ij]);
 	  if(!isSignal_gg) hist_["hBKG_gg"]->Fill(pt[ij]);
 	}
       // std::cout<<"Filling Jet histograms qg"<<std::endl;
-      if(fabs(flav[0])<=2 && flav[1] == 21)
+      if(isgq)
 	{
 	  hist_["hAllJets_qg"]->Fill(pt[ij]);
 	  if(isSignal_qg) hist_["hSignal_qg"]->Fill(pt[ij]);
 	  if(!isSignal_qg) hist_["hBKG_qg"]->Fill(pt[ij]);
 	}
       // std::cout<<"Filling Jet histograms qq"<<std::endl;
-      if(flav[0] == 21 && fabs(flav[1])<=2)
+      if(isgq)
 	{
 	  hist_["hAllJets_gq"]->Fill(pt[ij]);
 	  if(isSignal_gq) hist_["hSignal_gq"]->Fill(pt[ij]);
@@ -624,7 +714,7 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     }
   
   
-
+  
   // // do the combinatorial BKG checks and histogram fills
   // if ( isFlavorLeadJet && isFlavorSubLeadJet )
   //   {
@@ -668,18 +758,36 @@ QCDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
   // 		hist_["hBKG"]->Fill(aJet->pt());
   // 	    }
   // 	}
-      
+  
   //   }
 
+  
+  // std::cout<<"Leading Jet pT = "<<pt[0] <<"; eta = "<<eta[0]<<"; phi = "<<phi[0]<<std::endl;
+  // std::cout<<"SubLeading Jet pT = "<<pt[1] <<"; eta = "<<eta[1]<<"; phi = "<<phi[1]<<std::endl;
+  // std::cout<<"third  Jet pT = "<<pt[2] <<"; eta = "<<eta[2]<<"; phi = "<<phi[2]<<std::endl;
+  
   // charged particle spectra and ff matrix
-  double lead_track_pt = 0.0;
+  lead_track_pt = 0.0;
   for( const auto & h : *pcol )
     {
-      // skip decayed  particles
-      if( h.status() != 1  ) continue;
 
-      if(fabs(h.pdgId())<=2 && h.pdgId()==21)std::cout<<"gen particle type = "<<h.pdgId()<<std::endl;
-
+      if(h.status() != 1) continue;
+      
+      // counter++;
+      // // Only look at the initial scalttered particles 
+      // // if( h.status() == 2 || h.status() == 3  ){
+      // // 	if(fabs(h.pdgId())<=2 || h.pdgId()==21) std::cout<<"gen particle type = "<<h.pdgId()<<std::endl;
+      // // }
+      // // number 7 and 8 are the initial scattered particles. 
+      // if(counter == 7 || counter == 8)
+      // 	{
+      // 	  // std::cout<<"Gen Particle: "<<counter<<"; id = "<<h.pdgId()<<"; pt = "<<h.pt()<<"; eta = "<<h.eta()<<"; phi = "<<h.phi()<<std::endl<<"                DeltaR with Leading = "<<(float)deltaR(h.eta(), h.phi(), eta[0], phi[0])<<std::endl<<"                DeltaR with subleading = "<<(float)deltaR(h.eta(), h.phi(), eta[1], phi[1])<<std::endl<<"                DeltaR with third = "<<(float)deltaR(h.eta(), h.phi(), eta[2], phi[2])<<std::endl;
+      // 	  par_pt.push_back(h.pt());
+      // 	  par_eta.push_back(h.eta());
+      // 	  par_phi.push_back(h.phi());
+      // 	  par_flav.push_back(h.pdfId());
+      // 	}
+      
       // update leading track
       if( h.charge() != 0 && fabs(h.eta()) < 2.5 && lead_track_pt < h.pt() )
 	lead_track_pt = h.pt(); 

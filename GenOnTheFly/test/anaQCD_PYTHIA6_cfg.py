@@ -19,7 +19,7 @@ from FWCore.ParameterSet.VarParsing import VarParsing
 options = VarParsing ('standard')
 
 options.output = 'QCDAna.root'
-options.maxEvents = 10
+options.maxEvents = 200000
 
 options.register('tune',
                  "Z2",
@@ -40,13 +40,13 @@ options.register('sqrtS',
                  "Center-of-mass energy")
 
 options.register('ptHatLow',
-                 50,
+                 80,
                  VarParsing.multiplicity.singleton,
                  VarParsing.varType.int,
                  "Minimum pt-hat")
 
 options.register('ptHatHigh',
-                 80,
+                 120,
                  VarParsing.multiplicity.singleton,
                  VarParsing.varType.int,
                  "Maximum pt-hat")
@@ -68,7 +68,7 @@ process.options = cms.untracked.PSet(
   wantSummary = cms.untracked.bool(True)
 )
 
-process.MessageLogger.cerr.FwkReport.reportEvery = 1000
+process.MessageLogger.cerr.FwkReport.reportEvery = 10000
 
 
 process.TFileService = cms.Service("TFileService",
@@ -158,8 +158,8 @@ process.qcdAna = cms.EDAnalyzer('QCDAnalyzer',
                                 useRapidity = cms.bool(False),
                                 jetEtaMin = cms.double(-2.0),
                                 jetEtaMax = cms.double(2.0),
-                                hEtaMin = cms.double(-2.4),
-                                hEtaMax = cms.double(2.4),
+                                hEtaMin = cms.double(-2.0),
+                                hEtaMax = cms.double(2.0),
                                 jetRadius = cms.double(0.3),
                                 pthatMin = cms.double(options.ptHatLow),
                                 pthatMax = cms.double(options.ptHatHigh),
