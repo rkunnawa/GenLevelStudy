@@ -15,19 +15,12 @@ scram p CMSSW CMSSW_7_3_1
 cd CMSSW_7_3_1/src
 cmsenv
 
-mkdir Appeltel
-cd Appeltel
-git clone https://github.com/appeltel/GenOnTheFly.git
+git clone https://github.com/rkunnawa/GenLevelStudy.git
 cd GenOnTheFly
 scram b
 cd test 
-cmsRun anaQCD_PYTHIA8_cfg.py
+cmsRun anaQCD_PYTHIA6_cfg.py
 ```
-
-To run a set of 100k events each in 10 different "pt-hat" ranges, 
-using PYTHIA8 Tune 4C, run
-the script
-`test/submitPYTHIA8_QCDana.sh`
 
 The analyzer output from different pt-hat ranges can be combined using the 
 ROOT macro `makeCombinedPtHatSample.C` which takes the cross sections and 
